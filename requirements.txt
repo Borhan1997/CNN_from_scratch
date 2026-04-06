@@ -1,0 +1,12 @@
+torch==2.5.1
+torchaudio==2.5.1
+torchcodec==0.2.0
+pandas
+numpy
+tqdm
+tensorboard
+fastapi
+librosa
+pydantic
+soundfile
+
