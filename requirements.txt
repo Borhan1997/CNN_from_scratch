@@ -5,4 +5,8 @@ pandas
 numpy
 tqdm
 tensorboard
+fastapi
+librosa
+pydantic
+soundfile
 

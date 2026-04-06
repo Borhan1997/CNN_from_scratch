@@ -1,5 +1,20 @@
 import sys
 import modal
+import os
+import torch
+import torchaudio
+from torch.utils.data import Dataset, DataLoader
+from torch.utils.tensorboard import SummaryWriter
+import torch.nn as nn
+import torch.optim as optim
+from torch.optim.lr_scheduler import OneCycleLR
+import torchaudio.transforms as T
+from pathlib import Path
+import pandas as pd
+from tqdm import tqdm
+from datetime import datetime
+import numpy as np
+from model import AudioCNN
 
 
 
@@ -21,86 +36,69 @@ volume = modal.Volume.from_name("esc50-data", create_if_missing=True)
 model_volume = modal.Volume.from_name("esc-model", create_if_missing=True)
 
 
+class ESC50Dataset(Dataset):
+    def __init__(self, data_dir, metadata_file, split="train", transform=None):
+        super().__init__()
+        self.data_dir = Path(data_dir)
+        self.metadata = pd.read_csv(metadata_file)
+        self.split = split
+        self.transform = transform
+
+        if split == 'train':
+            self.metadata = self.metadata[self.metadata['fold'] != 5]
+        else :
+            self.metadata = self.metadata[self.metadata['fold'] == 5]
+
+        self.classes = sorted(self.metadata['category'].unique())
+        self.class_to_idx = {cls: idx for idx, cls in enumerate(self.classes)}
+        self.metadata['label'] = self.metadata['category'].map(self.class_to_idx)
+
+    def __len__(self):
+        return len(self.metadata)
+    
+    def __getitem__(self, idx):
+        row = self.metadata.iloc[idx]
+        audio_path = self.data_dir / "audio" / row['filename']
+
+        waveform, sample_rate = torchaudio.load(audio_path, backend="ffmpeg")
+        
+
+        if waveform.shape[0] > 1:
+            waveform = torch.mean(waveform, dim=0, keepdim=True)
+
+        if self.transform:
+            spectogram = self.transform(waveform)
+        else:
+            spectogram = waveform
+
+        return spectogram, row['label']
+    
+def mixup_data(x,y):
+    lam = np.random.beta(0.2, 0.2)
+
+    batch_size = x.size(0)
+    index = torch.randperm(batch_size).to(x.device) #Corrected
+
+    mixed_x = lam*x + (1 - lam)*x[index, :]
+    y_a, y_b = y, y[index]
+
+    return mixed_x, y_a, y_b, lam
+
+def mixup_criterion(criterion, pred, y_a, y_b, lam):
+    return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+
+
+
 @app.function(image=image, gpu="A10", volumes={"/data": volume, "/models":model_volume}, timeout= 60*60*3)
 def train():
-    import os
-    import torch
-    import torchaudio
-    from torch.utils.data import Dataset, DataLoader
-    from torch.utils.tensorboard import SummaryWriter
-    import torch.nn as nn
-    import torch.optim as optim
-    from torch.optim.lr_scheduler import OneCycleLR
-    import torchaudio.transforms as T
-    from pathlib import Path
-    import pandas as pd
-    from tqdm import tqdm
-    from datetime import datetime
-    import numpy as np
-    from model import AudioCNN
-
-    # if "ffmpeg" in torchaudio.list_audio_backends():
-    #     torchaudio.set_audio_backend("ffmpeg")
-
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_dir = f'/models/tensorboard_logs/run_{timestamp}'
     writer = SummaryWriter(log_dir)
 
-    class ESC50Dataset(Dataset):
-        def __init__(self, data_dir, metadata_file, split="train", transform=None):
-            super().__init__()
-            self.data_dir = Path(data_dir)
-            self.metadata = pd.read_csv(metadata_file)
-            self.split = split
-            self.transform = transform
-
-            if split == 'train':
-                self.metadata = self.metadata[self.metadata['fold'] != 5]
-            else :
-                self.metadata = self.metadata[self.metadata['fold'] == 5]
-
-            self.classes = sorted(self.metadata['category'].unique())
-            self.class_to_idx = {cls: idx for idx, cls in enumerate(self.classes)}
-            self.metadata['label'] = self.metadata['category'].map(self.class_to_idx)
-
-        def __len__(self):
-            return len(self.metadata)
-        
-        def __getitem__(self, idx):
-            row = self.metadata.iloc[idx]
-            audio_path = self.data_dir / "audio" / row['filename']
-
-            waveform, sample_rate = torchaudio.load(audio_path, backend="ffmpeg")
-            
-
-            if waveform.shape[0] > 1:
-                waveform = torch.mean(waveform, dim=0, keepdim=True)
-
-            if self.transform:
-                spectogram = self.transform(waveform)
-            else:
-                spectogram = waveform
-
-            return spectogram, row['label']
-        
-    def mixup_data(x,y):
-        lam = np.random.beta(0.2, 0.2)
-
-        batch_size = x.size(0)
-        index = torch.randperm(batch_size).to(x.device) #Corrected
-
-        mixed_x = lam*x + (1 - lam)*x[index, :]
-        y_a, y_b = y, y[index]
-
-        return mixed_x, y_a, y_b, lam
-    
-    def mixup_criterion(criterion, pred, y_a, y_b, lam):
-        return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
-
     esc50_dir = Path("/opt/esc50-data")
     train_transform = nn.Sequential(
         T.MelSpectrogram(
-            sample_rate=22050,
+            sample_rate=44100,
             n_fft=1024,
             hop_length=512,
             n_mels=128,
@@ -114,7 +112,7 @@ def train():
 
     val_transform = nn.Sequential(
         T.MelSpectrogram(
-            sample_rate=22050,
+            sample_rate=44100,
             n_fft=1024,
             hop_length=512,
             n_mels=128,
@@ -130,7 +128,7 @@ def train():
     
     val_dataset = ESC50Dataset(data_dir=esc50_dir,
                                  metadata_file=esc50_dir / "meta" / "esc50.csv",
-                                 split="test", transform=train_transform)
+                                 split="test", transform=val_transform)
     
     print(f"Training samples: {len(train_dataset)}")
     print(f"Val samples: {len(val_dataset)}")

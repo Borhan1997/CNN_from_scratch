@@ -1,3 +1,51 @@
 __pycache__/
 .venv/
 .vscode/
+
+#WebApp
+neural-ear/.env
+
+# dependencies
+neural-ear/node_modules
+neural-ear/.pnp
+neural-ear/.pnp.js
+
+# testing
+neural-ear/coverage
+
+# database
+neural-ear/prisma/db.sqlite
+neural-ear/prisma/db.sqlite-journal
+neural-ear/db.sqlite
+
+# next.js
+neural-ear/.next/
+neural-ear/out/
+neural-ear/next-env.d.ts
+
+# production
+neural-ear/build
+
+# misc
+neural-ear/.DS_Store
+neural-ear/*.pem
+
+# debug
+neural-ear/npm-debug.log*
+neural-ear/yarn-debug.log*
+neural-ear/yarn-error.log*
+neural-ear/.pnpm-debug.log*
+
+# local env files
+# do not commit any .env files to git, except for the .env.example file. https://create.t3.gg/en/usage/env-variables#using-environment-variables
+neural-ear/.env
+neural-ear/.env*.local
+
+# vercel
+neural-ear/.vercel
+
+# typescript
+neural-ear/*.tsbuildinfo
+
+# idea files
+neural-ear/.idea
