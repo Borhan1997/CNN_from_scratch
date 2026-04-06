@@ -1,3 +1,4 @@
+import shutil
 import sys
 import modal
 import os
@@ -35,6 +36,21 @@ image = (modal.Image.debian_slim()
 volume = modal.Volume.from_name("esc50-data", create_if_missing=True)
 model_volume = modal.Volume.from_name("esc-model", create_if_missing=True)
 
+
+# --- ONE-TIME SYNC FUNCTION ---
+@app.function(image=image, volumes={"/data": volume})
+def sync_to_volume():
+    """Copies data from the temporary Image layer to the permanent Volume."""
+    # Check if data is already there to avoid redundant copying
+    if not os.path.exists("/data/meta/esc50.csv"):
+        print("📦 Transferring data from Image to Volume...")
+        # We copy from the Image (/opt/esc50-data) to the Volume (/data)
+        shutil.copytree("/opt/esc50-data", "/data", dirs_exist_ok=True)
+        
+        volume.commit() 
+        print("✅ Data successfully persisted in 'esc50-data' volume.")
+    else:
+        print("ℹ️ Data already exists in Volume. No action needed.")
 
 class ESC50Dataset(Dataset):
     def __init__(self, data_dir, metadata_file, split="train", transform=None):
@@ -227,7 +243,9 @@ def train():
 
 @app.local_entrypoint()
 def main():
+    #sync_to_volume.remote()
     train.remote()
+    
 
 
 
