@@ -105,6 +105,3 @@ Update the endpoint URL in `src/app/page.tsx` to point at your own deployed Moda
 
 Best validation accuracy: **80.25%** across the 50 ESC-50 classes, reached at epoch 79 of training.
 
-## License
-
-_No license file yet — consider adding an MIT license if you want others to freely reuse this code._
