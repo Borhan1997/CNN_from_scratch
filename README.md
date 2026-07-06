@@ -1,4 +1,4 @@
-# CNN_from_scratch : Neural Ear — Audio Classification CNN Built From Scratch
+# CNN from scratch : Neural Ear — Audio Classification CNN Built From Scratch
 
 A custom ResNet-style convolutional neural network, implemented from scratch in PyTorch (no pretrained backbone), trained to classify 50 categories of environmental sound — from animal calls to household and urban noises. The model is trained and served on [Modal](https://modal.com)'s serverless GPU infrastructure, and paired with an interactive Next.js frontend that visualizes the network's predictions, input spectrogram, waveform, and internal feature maps layer by layer.
 
