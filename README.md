@@ -101,3 +101,7 @@ Update the endpoint URL in `src/app/page.tsx` to point at your own deployed Moda
 - [ESC-50](https://github.com/karolpiczak/ESC-50) by Karol J. Piczak — 2,000 labeled environmental audio recordings across 50 classes, used here under its original license.
 - Model training and serving powered by [Modal](https://modal.com).
 
+## Results
+
+Best validation accuracy: **80.25%** across the 50 ESC-50 classes, reached at epoch 79 of training.
+
